@@ -1,4 +1,4 @@
----
+---   #1.	Create a playbook to install git and maven.
 - name: Install Git and Maven on localhost
   hosts: localhost
   become: yes
@@ -18,7 +18,7 @@
         name: java
         state: present
 
-
+#2.	Create a playbook to install tomcat.
 - name: Install Apache Tomcat on localhost
   hosts: localhost
   become: yes
@@ -78,7 +78,7 @@
     - debug:
         msg: "Tomcat startup response: {{ tomcat_response.content | default('Failed to fetch') }}"
 
-
+#3.	Create a playbook to clone or pull the code from git hub.
 - name: Pull code from Git repository
   hosts: localhost
   become: yes
@@ -106,7 +106,7 @@
         version: main
         update: yes
 
-
+#4.	Create a playbook to build the code using maven.
 - name: Build code using Maven
   hosts: localhost
   become: yes
@@ -134,7 +134,7 @@
       args:
         chdir: /pet-shop
 
-
+#5.	Create a playbook to deploy the war file into tomcat.
 - name: Deploy WAR file to Apache Tomcat on localhost
   hosts: localhost
   become: yes
