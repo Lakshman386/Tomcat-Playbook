@@ -1,0 +1,166 @@
+---
+- name: Install Git and Maven on localhost
+  hosts: localhost
+  become: yes
+  tasks:
+    - name: Ensure Git is installed
+      package:
+        name: git
+        state: present
+
+    - name: Ensure Maven is installed
+      package:
+        name: maven
+        state: present
+
+    - name: Ensure Java is installed
+      package:
+        name: java
+        state: present
+
+
+- name: Install Apache Tomcat on localhost
+  hosts: localhost
+  become: yes
+  vars:
+    tomcat_version: 10.1.33
+    tomcat_install_dir: /opt/tomcat
+  tasks:
+    - name: Install required packages
+      package:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - wget
+        - tar
+
+    - name: Download Tomcat
+      get_url:
+        url: "https://dlcdn.apache.org/tomcat/tomcat-10/v10.1.33/bin/apache-tomcat-10.1.33.tar.gz"
+        dest: /tmp/apache-tomcat-10.1.33.tar.gz
+
+    - name: Create installation directory
+      file:
+        path: "/opt/tomcat/"
+        state: directory
+        mode: '0755'
+
+    - name: Extract Tomcat archive
+      unarchive:
+        src: /tmp/apache-tomcat-10.1.33.tar.gz
+        dest: "/opt/tomcat"
+        remote_src: yes
+
+    - name: Set permissions for Tomcat directory
+      file:
+        path: "/opt/tomcat/"
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Link Tomcat to a simpler path
+      file:
+        src: "/opt/tomcat/apache-tomcat-10.1.33"
+        dest: /opt/tomcat-latest
+        state: link
+
+    - name: Start Tomcat server
+      shell: ./startup.sh
+      args:
+        chdir: /opt/tomcat-latest/bin
+
+    - name: Verify Tomcat is running
+      uri:
+        url: http://localhost:8080
+        return_content: yes
+      register: tomcat_response
+    - debug:
+        msg: "Tomcat startup response: {{ tomcat_response.content | default('Failed to fetch') }}"
+
+
+- name: Pull code from Git repository
+  hosts: localhost
+  become: yes
+  vars:
+    repo_url: https://github.com/Lakshman386/pet_shop.git
+    dest_dir: /pet-shop
+    branch: main
+  tasks:
+    - name: Ensure Git is installed
+      package:
+        name: git
+        state: present
+
+    - name: Clone repository if not present
+      git:
+        repo: https://github.com/Lakshman386/pet_shop.git
+        dest: /pet-shop
+        version: main
+        update: no
+
+    - name: Update repository if already cloned
+      git:
+        repo: https://github.com/Lakshman386/pet_shop.git
+        dest: /pet-shop
+        version: main
+        update: yes
+
+
+- name: Build code using Maven
+  hosts: localhost
+  become: yes
+  vars:
+    code_dir: /pet-shop
+    maven_build_command: "mvn clean install"
+  tasks:
+    - name: Ensure Maven is installed
+      package:
+        name: maven
+        state: present
+
+    - name: Check if code directory exists
+      stat:
+        path: /pet-shop
+      register: code_dir_status
+
+    - name: Fail if code directory does not exist
+      fail:
+        msg: "Code directory /pet-shop does not exist. Please pull the code first."
+      when: not code_dir_status.stat.exists
+
+    - name: Build code using Maven
+      command: mvn clean install
+      args:
+        chdir: /pet-shop
+
+
+- name: Deploy WAR file to Apache Tomcat on localhost
+  hosts: localhost
+  become: yes
+  vars:
+    war_file: /pet-shop/target/petshop.war
+    tomcat_deploy_dir: /opt/tomcat-latest/webapps
+    tomcat_service_name: tomcat
+  tasks:
+    - name: Ensure the WAR file exists
+      stat:
+        path: /opt/tomcat-latest/webapps
+      register: war_status
+
+    - name: Fail if the WAR file does not exist
+      fail:
+        msg: "The WAR file petshop.war does not exist."
+      when: not war_status.stat.exists
+
+    - name: Copy the WAR file to the Tomcat webapps directory
+      copy:
+        src: /pet-shop/target/petshop.war
+        dest: /opt/tomcat-latest/webapps
+
+#   - name: Restart the Tomcat service
+#     command: systemctl restart tomcat
+#       service:
+#         name: tomcat
+#         state: restarted
+
