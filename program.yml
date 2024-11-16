@@ -71,7 +71,7 @@
         chdir: /opt/tomcat-latest/bin
 
     - name: Verify Tomcat is running
-      uri:
+      url:
         url: http://localhost:8080
         return_content: yes
       register: tomcat_response
